@@ -13,7 +13,7 @@ const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
     origin: process.env.NODE_ENV === 'production' 
-      ? ["https://your-app.vercel.app", "https://your-app.up.railway.app"] 
+      ? true // Allow all origins in production for Vercel
       : "http://localhost:3000",
     methods: ["GET", "POST"],
     credentials: true
@@ -32,6 +32,19 @@ app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-XSS-Protection', '1; mode=block');
+  
+  // CORS headers untuk Vercel
+  const allowedOrigins = process.env.NODE_ENV === 'production' 
+    ? ['https://*.vercel.app', 'https://*.railway.app']
+    : ['http://localhost:3000'];
+  
+  const origin = req.headers.origin;
+  if (allowedOrigins.some(allowed => origin && origin.match(allowed))) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+  
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   next();
 });
 
@@ -62,7 +75,8 @@ app.get('/health', (req, res) => {
   res.status(200).json({ 
     status: 'OK', 
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development'
+    environment: process.env.NODE_ENV || 'development',
+    platform: 'Vercel'
   });
 });
 
@@ -150,7 +164,8 @@ app.get('/api/stats', (req, res) => {
   res.json({
     totalBots,
     totalMessages,
-    uptime: process.uptime()
+    uptime: process.uptime(),
+    memory: process.memoryUsage()
   });
 });
 
@@ -252,7 +267,7 @@ io.on('connection', (socket) => {
           headers: {
             'Content-Type': 'application/json',
           },
-          timeout: 10000 // 10 detik timeout
+          timeout: 15000 // 15 detik timeout untuk Vercel
         }
       );
       
@@ -331,7 +346,7 @@ function isValidUrl(string) {
   }
 }
 
-// Graceful shutdown
+// Graceful shutdown untuk Vercel
 process.on('SIGTERM', () => {
   console.log('Menerima SIGTERM, menutup server dengan baik...');
   server.close(() => {
@@ -355,3 +370,5 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`Gemini API Key: ${API_KEY ? 'Tersedia' : 'Tidak tersedia'}`);
 });
+
+module.exports = app;
