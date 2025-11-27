@@ -4,62 +4,64 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Create AI Bot - Buat dan Bagikan Bot AI Anda</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>Create AI Bot</h1>
-            <p>Buat dan bagikan bot AI dengan persona unik Anda sendiri!</p>
-        </header>
+    <div id="app-root">
+        <div class="container">
+            <header>
+                <h1>Create AI Bot</h1>
+                <p>Buat dan bagikan bot AI dengan persona unik Anda sendiri!</p>
+            </header>
 
-        <main>
-            <section class="create-bot-section">
-                <button id="createBotBtn" class="btn-primary">Create AI Bot Anda</button>
-                
-                <div id="botForm" class="form-container hidden">
-                    <h2>Buat Bot Baru</h2>
-                    <form id="botCreationForm">
-                        <div class="form-group">
-                            <label for="botName">Nama Bot:</label>
-                            <input type="text" id="botName" required placeholder="Masukkan nama untuk bot Anda">
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="botDescription">Persona/Deskripsi Bot:</label>
-                            <textarea id="botDescription" required placeholder="Deskripsikan persona bot Anda. Contoh: 'Saya adalah asisten AI yang ramah dan membantu dengan pengetahuan luas tentang teknologi.'"></textarea>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="botImage">URL Gambar Profil (opsional):</label>
-                            <input type="url" id="botImage" placeholder="https://example.com/image.jpg">
-                        </div>
-                        
-                        <button type="submit" class="btn-primary">Create Bot</button>
-                    </form>
-                </div>
-                
-                <div id="botCreated" class="result-container hidden">
-                    <h2>Bot Berhasil Dibuat!</h2>
-                    <div id="botInfo" class="bot-info"></div>
-                    <div class="share-options">
-                        <p>Bagikan bot Anda:</p>
-                        <button id="copyLinkBtn" class="btn-secondary">Salin Link</button>
-                        <a id="openBotLink" class="btn-primary" target="_blank">Buka Chat Bot</a>
+            <main>
+                <section class="create-bot-section">
+                    <button id="createBotBtn" class="btn-primary">Create AI Bot Anda</button>
+
+                    <div id="botForm" class="form-container hidden">
+                        <h2>Buat Bot Baru</h2>
+                        <form id="botCreationForm">
+                            <div class="form-group">
+                                <label for="botName">Nama Bot:</label>
+                                <input type="text" id="botName" required placeholder="Masukkan nama untuk bot Anda">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="botDescription">Persona/Deskripsi Bot:</label>
+                                <textarea id="botDescription" required placeholder="Deskripsikan persona bot Anda. Contoh: 'Saya adalah asisten AI yang ramah dan membantu dengan pengetahuan luas tentang teknologi.'"></textarea>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="botImage">URL Gambar Profil (opsional):</label>
+                                <input type="url" id="botImage" placeholder="https://example.com/image.jpg">
+                            </div>
+
+                            <button type="submit" class="btn-primary">Create Bot</button>
+                        </form>
                     </div>
-                </div>
-            </section>
-            
-            <section class="public-bots-section">
-                <h2>Bot Publik</h2>
-                <div id="publicBots" class="bots-grid">
-                    <!-- Daftar bot publik akan dimuat di sini -->
-                </div>
-            </section>
-        </main>
+
+                    <div id="botCreated" class="result-container hidden">
+                        <h2>Bot Berhasil Dibuat!</h2>
+                        <div id="botInfo" class="bot-info"></div>
+                        <div class="share-options">
+                            <p>Bagikan bot Anda:</p>
+                            <button id="copyLinkBtn" class="btn-secondary">Salin Link</button>
+                            <a id="openBotLink" class="btn-primary" target="_blank">Buka Chat Bot</a>
+                        </div>
+                    </div>
+                </section>
+                
+                <section class="public-bots-section">
+                    <h2>Bot Publik</h2>
+                    <div id="publicBots" class="bots-grid">
+                        <!-- Daftar bot publik akan dimuat di sini -->
+                    </div>
+                </section>
+            </main>
+        </div>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
-    <script src="script.js"></script>
+    <script src="/script.js"></script>
 </body>
 </html>

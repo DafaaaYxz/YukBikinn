@@ -25,7 +25,7 @@ const io = socketIo(server, {
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static('public'));
+app.use(express.static(__dirname));
 
 // Security headers middleware
 app.use((req, res, next) => {
@@ -61,13 +61,9 @@ if (!API_KEY) {
   console.warn('Peringatan: GEMINI_API_KEY tidak ditemukan di environment variables');
 }
 
-// Routes
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
-app.get('/bot/:botId', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'bot.html'));
+// Routes - for SPA, all relevant paths should serve the main index file
+app.get(['/', '/bot/:botId'], (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 // Health check endpoint untuk Vercel/Railway
@@ -363,12 +359,14 @@ process.on('SIGINT', () => {
   });
 });
 
-// Jalankan server
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server berjalan di http://0.0.0.0:${PORT}`);
-  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`Gemini API Key: ${API_KEY ? 'Tersedia' : 'Tidak tersedia'}`);
-});
+// Jalankan server only if this file is run directly
+if (require.main === module) {
+  const PORT = process.env.PORT || 3000;
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server berjalan di http://0.0.0.0:${PORT}`);
+    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`Gemini API Key: ${API_KEY ? 'Tersedia' : 'Tidak tersedia'}`);
+  });
+}
 
-module.exports = app;
+module.exports = server;
