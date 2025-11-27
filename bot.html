@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Bot</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header" id="chatHeader">
+            <button class="back-btn" onclick="goBack()">← Kembali</button>
+        </div>
+        
+        <div class="chat-messages" id="chatMessages">
+            <!-- Pesan akan dimuat di sini -->
+        </div>
+        
+        <div class="chat-input-container">
+            <input type="text" id="messageInput" class="chat-input" placeholder="Ketik pesan..." autocomplete="off">
+            <button id="sendBtn" class="send-btn">➤</button>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        // Dapatkan ID bot dari URL
+        const pathSegments = window.location.pathname.split('/');
+        const botId = pathSegments[pathSegments.length - 1];
+        
+        // Koneksi Socket.io
+        const socket = io();
+        
+        // Elemen DOM
+        const chatHeader = document.getElementById('chatHeader');
+        const chatMessages = document.getElementById('chatMessages');
+        const messageInput = document.getElementById('messageInput');
+        const sendBtn = document.getElementById('sendBtn');
+        
+        // Muat data bot dan bergabung ke room
+        async function initializeChat() {
+            try {
+                const response = await fetch(`/api/bot/${botId}`);
+                const bot = await response.json();
+                
+                // Update header
+                chatHeader.innerHTML = `
+                    <img src="${bot.imageUrl}" alt="${bot.name}" class="chat-header-avatar" onerror="this.src='/default-avatar.png'">
+                    <div>
+                        <h2>${bot.name}</h2>
+                        <p>${bot.description}</p>
+                    </div>
+                    <button class="back-btn" onclick="goBack()">← Kembali</button>
+                `;
+                
+                // Bergabung ke room bot
+                socket.emit('join-bot', botId);
+            } catch (error) {
+                console.error('Error memuat data bot:', error);
+                chatHeader.innerHTML = `
+                    <h2>Bot Tidak Ditemukan</h2>
+                    <button class="back-btn" onclick="goBack()">← Kembali</button>
+                `;
+            }
+        }
+        
+        // Event listeners
+        sendBtn.addEventListener('click', sendMessage);
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+        
+        // Socket event listeners
+        socket.on('message-history', (messages) => {
+            chatMessages.innerHTML = '';
+            messages.forEach(message => {
+                addMessageToChat(message);
+            });
+            scrollToBottom();
+        });
+        
+        socket.on('new-message', (message) => {
+            addMessageToChat(message);
+            scrollToBottom();
+        });
+        
+        socket.on('error', (error) => {
+            alert('Error: ' + error);
+        });
+        
+        // Fungsi untuk mengirim pesan
+        function sendMessage() {
+            const message = messageInput.value.trim();
+            if (!message) return;
+            
+            socket.emit('send-message', {
+                botId: botId,
+                message: message,
+                userName: 'Anda'
+            });
+            
+            messageInput.value = '';
+        }
+        
+        // Fungsi untuk menambahkan pesan ke chat
+        function addMessageToChat(message) {
+            const messageElement = document.createElement('div');
+            messageElement.className = `message ${message.type}`;
+            
+            const time = new Date(message.timestamp).toLocaleTimeString('id-ID', {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            
+            messageElement.innerHTML = `
+                <img src="${message.type === 'bot' ? 
+                    document.querySelector('.chat-header-avatar')?.src || '/default-avatar.png' : 
+                    '/user-avatar.png'}" 
+                    class="message-avatar" 
+                    onerror="this.src='/default-avatar.png'">
+                <div class="message-content">
+                    <div class="message-sender">${message.sender}</div>
+                    <div class="message-text">${message.content}</div>
+                    <div class="message-time">${time}</div>
+                </div>
+            `;
+            
+            chatMessages.appendChild(messageElement);
+        }
+        
+        // Fungsi untuk scroll ke bawah
+        function scrollToBottom() {
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+        
+        // Fungsi untuk kembali
+        function goBack() {
+            window.history.back();
+        }
+        
+        // Inisialisasi chat
+        initializeChat();
+    </script>
+</body>
+</html>
