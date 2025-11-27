@@ -9,16 +9,20 @@
 <body>
     <div class="chat-container">
         <div class="chat-header" id="chatHeader">
-            <button class="back-btn" onclick="goBack()">← Kembali</button>
+            <div class="header-content">
+                <button class="back-btn" onclick="goBack()">← Kembali</button>
+            </div>
         </div>
         
         <div class="chat-messages" id="chatMessages">
-            <!-- Pesan akan dimuat di sini -->
+            <div class="welcome-message">
+                <p>Memuat chat...</p>
+            </div>
         </div>
         
         <div class="chat-input-container">
-            <input type="text" id="messageInput" class="chat-input" placeholder="Ketik pesan..." autocomplete="off">
-            <button id="sendBtn" class="send-btn">➤</button>
+            <input type="text" id="messageInput" class="chat-input" placeholder="Ketik pesan..." autocomplete="off" disabled>
+            <button id="sendBtn" class="send-btn" disabled>➤</button>
         </div>
     </div>
 
@@ -28,8 +32,40 @@
         const pathSegments = window.location.pathname.split('/');
         const botId = pathSegments[pathSegments.length - 1];
         
-        // Koneksi Socket.io
-        const socket = io();
+        // Koneksi Socket.io dengan error handling
+        let socket;
+        let isConnected = false;
+
+        try {
+            socket = io({
+                transports: ['websocket', 'polling'],
+                timeout: 10000
+            });
+
+            socket.on('connect', () => {
+                console.log('Terhubung ke server');
+                isConnected = true;
+                updateConnectionStatus(true);
+            });
+
+            socket.on('disconnect', () => {
+                console.log('Terputus dari server');
+                isConnected = false;
+                updateConnectionStatus(false);
+                showChatNotification('Koneksi terputus. Mencoba menyambung kembali...', 'error');
+            });
+
+            socket.on('connect_error', (error) => {
+                console.error('Koneksi error:', error);
+                isConnected = false;
+                updateConnectionStatus(false);
+                showChatNotification('Gagal terhubung ke server', 'error');
+            });
+
+        } catch (error) {
+            console.error('Error initializing socket:', error);
+            showChatNotification('Error menginisialisasi koneksi', 'error');
+        }
         
         // Elemen DOM
         const chatHeader = document.getElementById('chatHeader');
@@ -40,26 +76,62 @@
         // Muat data bot dan bergabung ke room
         async function initializeChat() {
             try {
+                showChatNotification('Memuat data bot...', 'info');
+                
                 const response = await fetch(`/api/bot/${botId}`);
+                if (!response.ok) {
+                    if (response.status === 404) {
+                        throw new Error('Bot tidak ditemukan');
+                    } else {
+                        throw new Error('Gagal memuat data bot');
+                    }
+                }
+                
                 const bot = await response.json();
                 
                 // Update header
                 chatHeader.innerHTML = `
-                    <img src="${bot.imageUrl}" alt="${bot.name}" class="chat-header-avatar" onerror="this.src='/default-avatar.png'">
-                    <div>
-                        <h2>${bot.name}</h2>
-                        <p>${bot.description}</p>
+                    <div class="header-content">
+                        <img src="${bot.imageUrl}" alt="${bot.name}" class="chat-header-avatar" onerror="this.src='/default-avatar.png'">
+                        <div class="header-info">
+                            <h2>${bot.name}</h2>
+                            <p>${bot.description}</p>
+                        </div>
+                        <button class="back-btn" onclick="goBack()">← Kembali</button>
                     </div>
-                    <button class="back-btn" onclick="goBack()">← Kembali</button>
+                    <div class="connection-status" id="connectionStatus">
+                        <span class="status-dot"></span>
+                        <span class="status-text">Menghubungkan...</span>
+                    </div>
                 `;
                 
+                // Clear welcome message
+                chatMessages.innerHTML = '';
+                
                 // Bergabung ke room bot
-                socket.emit('join-bot', botId);
+                if (socket) {
+                    socket.emit('join-bot', botId);
+                }
+                
+                // Enable input
+                messageInput.disabled = false;
+                sendBtn.disabled = false;
+                messageInput.focus();
+                
             } catch (error) {
                 console.error('Error memuat data bot:', error);
                 chatHeader.innerHTML = `
-                    <h2>Bot Tidak Ditemukan</h2>
-                    <button class="back-btn" onclick="goBack()">← Kembali</button>
+                    <div class="header-content">
+                        <h2>Error</h2>
+                        <button class="back-btn" onclick="goBack()">← Kembali</button>
+                    </div>
+                `;
+                chatMessages.innerHTML = `
+                    <div class="error-message">
+                        <h3>${error.message}</h3>
+                        <p>Bot mungkin telah dihapus atau terjadi kesalahan server.</p>
+                        <button onclick="goBack()" class="btn-primary">Kembali ke Beranda</button>
+                    </div>
                 `;
             }
         }
@@ -67,67 +139,106 @@
         // Event listeners
         sendBtn.addEventListener('click', sendMessage);
         messageInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
                 sendMessage();
             }
         });
         
         // Socket event listeners
-        socket.on('message-history', (messages) => {
-            chatMessages.innerHTML = '';
-            messages.forEach(message => {
-                addMessageToChat(message);
+        if (socket) {
+            socket.on('message-history', (messages) => {
+                chatMessages.innerHTML = '';
+                if (messages.length === 0) {
+                    addWelcomeMessage();
+                } else {
+                    messages.forEach(message => {
+                        addMessageToChat(message);
+                    });
+                }
+                scrollToBottom();
             });
-            scrollToBottom();
-        });
-        
-        socket.on('new-message', (message) => {
-            addMessageToChat(message);
-            scrollToBottom();
-        });
-        
-        socket.on('error', (error) => {
-            alert('Error: ' + error);
-        });
+            
+            socket.on('new-message', (message) => {
+                addMessageToChat(message);
+                scrollToBottom();
+                
+                // Notification sound atau visual effect untuk pesan baru
+                if (message.type === 'bot' && !isMessageVisible(message)) {
+                    showNewMessageNotification(message);
+                }
+            });
+            
+            socket.on('error', (error) => {
+                showChatNotification('Error: ' + error, 'error');
+            });
+        }
         
         // Fungsi untuk mengirim pesan
         function sendMessage() {
+            if (!isConnected) {
+                showChatNotification('Tidak terhubung ke server. Silakan tunggu...', 'error');
+                return;
+            }
+            
             const message = messageInput.value.trim();
             if (!message) return;
             
-            socket.emit('send-message', {
-                botId: botId,
-                message: message,
-                userName: 'Anda'
-            });
+            // Disable input sementara
+            messageInput.disabled = true;
+            sendBtn.disabled = true;
+            
+            if (socket) {
+                socket.emit('send-message', {
+                    botId: botId,
+                    message: message,
+                    userName: 'Anda'
+                });
+            }
             
             messageInput.value = '';
+            
+            // Re-enable input setelah delay singkat
+            setTimeout(() => {
+                messageInput.disabled = false;
+                sendBtn.disabled = false;
+                messageInput.focus();
+            }, 100);
         }
         
         // Fungsi untuk menambahkan pesan ke chat
         function addMessageToChat(message) {
             const messageElement = document.createElement('div');
             messageElement.className = `message ${message.type}`;
+            messageElement.id = `message-${message.id}`;
             
             const time = new Date(message.timestamp).toLocaleTimeString('id-ID', {
                 hour: '2-digit',
                 minute: '2-digit'
             });
             
+            const avatarSrc = message.type === 'bot' 
+                ? (document.querySelector('.chat-header-avatar')?.src || '/default-avatar.png')
+                : '/user-avatar.png';
+            
             messageElement.innerHTML = `
-                <img src="${message.type === 'bot' ? 
-                    document.querySelector('.chat-header-avatar')?.src || '/default-avatar.png' : 
-                    '/user-avatar.png'}" 
+                <img src="${avatarSrc}" 
                     class="message-avatar" 
                     onerror="this.src='/default-avatar.png'">
                 <div class="message-content">
                     <div class="message-sender">${message.sender}</div>
-                    <div class="message-text">${message.content}</div>
+                    <div class="message-text">${formatMessage(message.content)}</div>
                     <div class="message-time">${time}</div>
                 </div>
             `;
             
             chatMessages.appendChild(messageElement);
+        }
+        
+        // Fungsi untuk format pesan (basic formatting)
+        function formatMessage(content) {
+            // Convert line breaks to <br>
+            return content.replace(/\n/g, '<br>');
         }
         
         // Fungsi untuk scroll ke bawah
@@ -140,8 +251,86 @@
             window.history.back();
         }
         
+        // Fungsi untuk update status koneksi
+        function updateConnectionStatus(connected) {
+            const statusElement = document.getElementById('connectionStatus');
+            if (statusElement) {
+                const dot = statusElement.querySelector('.status-dot');
+                const text = statusElement.querySelector('.status-text');
+                
+                if (connected) {
+                    dot.style.backgroundColor = '#10b981';
+                    text.textContent = 'Terhubung';
+                } else {
+                    dot.style.backgroundColor = '#ef4444';
+                    text.textContent = 'Terputus';
+                }
+            }
+        }
+        
+        // Fungsi untuk menampilkan notifikasi di chat
+        function showChatNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.className = `chat-notification chat-notification-${type}`;
+            notification.textContent = message;
+            
+            chatMessages.appendChild(notification);
+            scrollToBottom();
+            
+            // Hapus notifikasi setelah 5 detik
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.remove();
+                }
+            }, 5000);
+        }
+        
+        // Fungsi untuk menambahkan welcome message
+        function addWelcomeMessage() {
+            const welcomeElement = document.createElement('div');
+            welcomeElement.className = 'welcome-message';
+            welcomeElement.innerHTML = `
+                <div class="welcome-content">
+                    <h3>Mulai Percakapan</h3>
+                    <p>Kirim pesan untuk memulai chat dengan bot ini!</p>
+                </div>
+            `;
+            chatMessages.appendChild(welcomeElement);
+        }
+        
+        // Fungsi untuk check jika pesan visible
+        function isMessageVisible(message) {
+            // Implementasi sederhana untuk check visibility
+            return document.activeElement === messageInput;
+        }
+        
+        // Fungsi untuk show new message notification
+        function showNewMessageNotification(message) {
+            // Bisa ditambahkan sound notification atau browser notification di sini
+            if (Notification.permission === 'granted' && document.hidden) {
+                new Notification(`Pesan baru dari ${message.sender}`, {
+                    body: message.content.substring(0, 100) + '...',
+                    icon: '/default-avatar.png'
+                });
+            }
+        }
+        
+        // Request notification permission
+        if ('Notification' in window && Notification.permission === 'default') {
+            Notification.requestPermission();
+        }
+        
         // Inisialisasi chat
         initializeChat();
+        
+        // Auto-focus input ketika halaman loaded
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                if (!messageInput.disabled) {
+                    messageInput.focus();
+                }
+            }, 1000);
+        });
     </script>
 </body>
 </html>
